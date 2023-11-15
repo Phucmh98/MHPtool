@@ -1,0 +1,88 @@
+__title__="Void Cut\nElement"
+__doc__ = 'Cut Category form Void Cut'
+__author__ = 'Phuc'
+# -*- coding: utf-8 -*-
+
+import Autodesk
+from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory, Outline, BoundingBoxIntersectsFilter, LogicalAndFilter, ElementCategoryFilter, Transaction, InstanceVoidCutUtils
+from pyrevit import revit, DB, script, forms
+from rpw.ui.forms import FlexForm, Label, TextBox, Button, ComboBox, CheckBox, Separator,Alert
+import rpw
+from rpw import DB,ui
+from rpw.ui.forms import SelectFromList
+from pyrevit.forms import ProgressBar
+import deletewarning
+doc = __revit__.ActiveUIDocument.Document
+uidoc = __revit__.ActiveUIDocument
+
+# theme Dictionary
+res = forms.alert("When the file runs, Revit maybe crash. " 
+                                    "\n"
+                    "\nPlease save file before running",
+                  options=["Save File",
+                           
+                           "Run"],exitscript=True)
+if res == "Save File":
+    doc.Save()
+
+    
+
+#forms.alert('Hien is Gay!!!!', exitscript=False)
+
+cat_sel = SelectFromList('Select Category to Cut', ['Structure Framings', 
+                                        'Floors', 'Walls'])
+
+
+allGenToRun = FilteredElementCollector(doc, doc.ActiveView.Id).OfCategory(BuiltInCategory.OST_GenericModel).WhereElementIsNotElementType().ToElements()
+#print(allGenToRun)
+max_value = len(allGenToRun)
+
+for gen in allGenToRun:
+    #filter category
+    categoryFilter_beam = ElementCategoryFilter(BuiltInCategory.OST_StructuralFraming)
+    categoryFilter_floor = ElementCategoryFilter(BuiltInCategory.OST_Floors)
+    categoryFilter_wall = ElementCategoryFilter(BuiltInCategory.OST_Walls)
+    #intersect
+    box = gen.get_BoundingBox(doc.ActiveView)
+    outline = Outline(box.Min, box.Max)
+    bbFilter = BoundingBoxIntersectsFilter(outline)
+    #logicalAndFilter
+    logicalAndFilter_beam = LogicalAndFilter(bbFilter, categoryFilter_beam)
+    logicalAndFilter_floor = LogicalAndFilter(bbFilter, categoryFilter_floor)
+    logicalAndFilter_wall = LogicalAndFilter(bbFilter, categoryFilter_wall)
+    
+    
+    #FILTER element intersect generic
+    allBeams= FilteredElementCollector(doc, doc.ActiveView.Id).WherePasses(logicalAndFilter_beam).ToElements()
+    allFloor =FilteredElementCollector(doc, doc.ActiveView.Id).WherePasses(logicalAndFilter_floor).ToElements()
+    allWalls =FilteredElementCollector(doc, doc.ActiveView.Id).WherePasses(logicalAndFilter_wall).ToElements()
+    #===============>>>>>>>Main code
+    t = Transaction(doc, "Py: New Change Void Cut")
+    t.Start()
+    #option = Transaction.GetFailureHandlingOptions()
+    #option.SetFailuresPreprocessor(deletewarning.PreprocessFailures())
+    #Transaction.SetFailureHandlingOptions(option)
+    if cat_sel == 'Structure Framings':    
+        for beam in allBeams:                    
+            try:
+                #InstanceVoidCutUtils.RemoveInstanceVoidCut(doc, beam, gen)
+                InstanceVoidCutUtils.AddInstanceVoidCut(doc, beam, gen)
+            except:
+                continue
+    elif cat_sel == 'Floors':
+        for floor in allFloor:                    
+            try:
+                #InstanceVoidCutUtils.RemoveInstanceVoidCut(doc, floor, gen)
+                InstanceVoidCutUtils.AddInstanceVoidCut(doc, floor, gen)
+            except:
+                continue
+    elif cat_sel == 'Walls':
+        for wall in allWalls:                    
+            try:
+                #InstanceVoidCutUtils.RemoveInstanceVoidCut(doc, floor, gen)
+                InstanceVoidCutUtils.AddInstanceVoidCut(doc, wall, gen)
+            except:
+                continue   
+    t.Commit()
+
+Alert('{} Void Cut Success'.format(len(allGenToRun)), title="Element Changed", header="Complete")

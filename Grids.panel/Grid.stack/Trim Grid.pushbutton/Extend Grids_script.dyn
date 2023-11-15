@@ -1,0 +1,121 @@
+{
+  "Uuid": "12e1546d-ad11-4bd9-8ea7-66ab433bbe1c",
+  "IsCustomNode": false,
+  "Description": null,
+  "Name": "Extend Grids_script",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "import clr\r\nclr.AddReference('ProtoGeometry')\r\nimport Autodesk.DesignScript.Geometry as DSGeo\r\nfrom Autodesk.DesignScript.Geometry import *\r\n\r\n#import Revit API\r\nclr.AddReference('RevitAPI')\r\nimport Autodesk\r\nfrom Autodesk.Revit.DB import *\r\nimport Autodesk.Revit.DB as DB\r\n\r\n#import transactionManager and DocumentManager (RevitServices is specific to Dynamo)\r\nclr.AddReference('RevitServices')\r\nimport RevitServices\r\nfrom RevitServices.Persistence import DocumentManager\r\nfrom RevitServices.Transactions import TransactionManager\r\ndoc = DocumentManager.Instance.CurrentDBDocument\r\nuiapp = DocumentManager.Instance.CurrentUIApplication\r\nuidoc = uiapp.ActiveUIDocument\r\napp = uiapp.Application\r\nsdkNumber = int(app.VersionNumber)\r\n\r\n\r\nclr.AddReference(\"RevitNodes\")\r\nimport Revit\r\nclr.ImportExtensions(Revit.GeometryConversion)\r\n\r\ndef createDatumLine(boundLines, grid):\r\n\tgridLine = None\r\n\tcurveG = grid.Curve.ToProtoType()\r\n\tvectGrid = curveG.Direction \r\n\tptmid = curveG.PointAtParameter(0.5)\r\n\tlstPtToLine = []\r\n\tfor lineBound in boundLines:\r\n\t\tlineBoundDs = lineBound.ToProtoType()\r\n\t\tptmid = DSGeo.Point.ByCoordinates(ptmid.X, ptmid.Y, lineBoundDs.StartPoint.Z)\r\n\t\tinterResultA = ptmid.Project(lineBoundDs, vectGrid)\r\n\t\tinterResultB = ptmid.Project(lineBoundDs, vectGrid.Reverse())\r\n\r\n\t\tif len(interResultA) > 0:\r\n\t\t\tlstPtToLine.append(interResultA[0].ToXyz())\r\n\t\tif len(interResultB) > 0:\r\n\t\t\tlstPtToLine.append(interResultB[0].ToXyz())\t\t\t\r\n\r\n\tif len(lstPtToLine) == 2:\r\n\t\tgridLine = Autodesk.Revit.DB.Line.CreateBound(lstPtToLine[0], lstPtToLine[1])\r\n\treturn gridLine\r\n\r\n\t\t\t\t\t\r\ndef getBoundLines(bbx, Zvalue = 0):\r\n\tlstPt = []\r\n\tlstLine = []\r\n\tlstPt.append(XYZ(bbx.Min.X, bbx.Min.Y, Zvalue))\r\n\tlstPt.append(XYZ(bbx.Max.X, bbx.Min.Y, Zvalue))\r\n\tlstPt.append(XYZ(bbx.Max.X, bbx.Max.Y, Zvalue))\r\n\tlstPt.append(XYZ(bbx.Min.X, bbx.Max.Y, Zvalue))\r\n\tfor idx, pt in enumerate(lstPt):\r\n\t\tif idx == 0:\r\n\t\t\tlstLine.append(Line.CreateBound(lstPt[- 1], pt))\r\n\t\telse:\t\r\n\t\t\tlstLine.append(Line.CreateBound(lstPt[idx - 1], pt))\t\t\t\r\n\treturn lstLine\t\t\r\n\r\nactivView = doc.ActiveView\r\ncropBox = activView.CropBox \r\n\r\n\r\nfecGrids = FilteredElementCollector(doc, activView.Id).OfClass(DatumPlane).ToElements()\r\ncutOffset = fecGrids[0].GetCurvesInView(DatumExtentType.ViewSpecific, activView)[0].GetEndPoint(0).Z\r\nfecGrids = [x for x in fecGrids if isinstance(x, DB.Grid)]\r\n\r\noutLst = []\r\nboundLines = getBoundLines(cropBox, cutOffset)\r\n\r\n\r\nTransactionManager.Instance.EnsureInTransaction(doc)\r\nfor grid in fecGrids:\r\n\tnewGLine = createDatumLine(boundLines, grid)\r\n\tif newGLine and True:\r\n\t\tgrid.SetCurveInView(DatumExtentType.ViewSpecific, activView, newGLine)\r\n\t\toutLst.append(newGLine)\r\n\r\nTransactionManager.Instance.TransactionTaskDone()\r\n\r\nOUT = outLst",
+      "VariableInputPorts": true,
+      "Id": "9b3d106a03ca4431ad7dce9273bc9d44",
+      "Inputs": [
+        {
+          "Id": "95178d7614fd44028b37bdc434fd2d75",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "addd5f45c4fb44baa47498d31c7640d1",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded IronPython script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "NodeType": "BooleanInputNode",
+      "InputValue": false,
+      "Id": "a1c075f899eb4176ba48ebbb63b34614",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "6cce4fc29d804fc2b5ba0fe931fa72db",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Selection between a true and false."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "6cce4fc29d804fc2b5ba0fe931fa72db",
+      "End": "95178d7614fd44028b37bdc434fd2d75",
+      "Id": "ff9f4c832d9d4cc391cba75c53493420"
+    }
+  ],
+  "Dependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 10000.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.1.0.7500",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Background Preview",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Python Script",
+        "Id": "9b3d106a03ca4431ad7dce9273bc9d44",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 496.5,
+        "Y": 359.5
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Boolean",
+        "Id": "a1c075f899eb4176ba48ebbb63b34614",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 212.5,
+        "Y": 350.5
+      }
+    ],
+    "Annotations": [],
+    "X": 34.0,
+    "Y": -53.0,
+    "Zoom": 1.0
+  }
+}
